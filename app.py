@@ -81,7 +81,7 @@ def match_location():
                 t_val = str(row[out_idx]).strip() if len(row) > out_idx and row[out_idx] else ""
 
                 if sid == "3ByYkO" and i < 5:
-    print("行" + str(row_num) + " A=" + a_val + " D=" + d_val[:10])
+                    print("行" + str(row_num) + " A=" + a_val + " D=" + d_val[:10])
                         cell_range = sid + "!" + out_col + str(row_num) + ":" + out_col + str(row_num)
                         write_cell(TABLE1_TOKEN, cell_range, lookup[key])
                         print("写入 " + sid + " 第" + str(row_num) + "行")
