@@ -73,7 +73,7 @@ def match_location():
             out_idx = col_letter_to_index(out_col)
             end_col = out_col
 
-            rows = read_sheet(TABLE1_TOKEN, sid + "!A2:" + end_col + "500")
+            rows = read_sheet(TABLE1_TOKEN, sid + "!A2:AZ500")
             for i, row in enumerate(rows):
                 row_num = i + 2
                 a_val = str(row[0]).strip() if len(row) > 0 and row[0] else ""
