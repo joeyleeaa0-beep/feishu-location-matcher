@@ -41,7 +41,7 @@ def get_token():
 def read_sheet(spreadsheet, sheet_range):
     access_token = get_token()
     headers = {"Authorization": "Bearer " + access_token}
-    url = "https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/" + spreadsheet + "/values/" + sheet_range + "?valueRenderOption=ToString"
+    url = "https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/" + spreadsheet + "/values/" + sheet_range + "?valueRenderOption=FormattedValue"
     res = requests.get(url, headers=headers)
     return res.json().get("data", {}).get("valueRange", {}).get("values", [])
 
