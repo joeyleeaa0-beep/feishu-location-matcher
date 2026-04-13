@@ -8,16 +8,28 @@ app = Flask(__name__)
 FEISHU_APP_ID = os.environ.get("FEISHU_APP_ID")
 FEISHU_APP_SECRET = os.environ.get("FEISHU_APP_SECRET")
 TABLE1_TOKEN = "PojNsqwFdhMZrHt6WEzcU45LncF"
-TABLE1_SHEET = "1SeQMO"
 TABLE2_TOKEN = "V6G7sm6xPhtpcGt0bgVcVEv3nYf"
 RENDER_URL = os.environ.get("RENDER_URL", "")
 
-SHEETS = [
+TABLE2_SHEETS = [
     {"id": "1TTBGH", "city": "深圳"},
     {"id": "2sAdwn", "city": "上海"},
     {"id": "3DMFTo", "city": "成都"},
     {"id": "4iOHhP", "city": "天津"},
 ]
+
+TABLE1_SHEETS = [
+    {"id": "1SeQMO", "city_col": "A", "title_col": "D", "output_col": "T", "title_col_index": 3, "output_col_letter": "T"},
+    {"id": "0VAckj", "city_col": "A", "title_col": "D", "output_col": "Q", "title_col_index": 3, "output_col_letter": "Q"},
+    {"id": "2HSink", "city_col": "A", "title_col": "G", "output_col": "AE", "title_col_index": 6, "output_col_letter": "AE"},
+    {"id": "3ByYkO", "city_col": "A", "title_col": "D", "output_col": "L", "title_col_index": 3, "output_col_letter": "L"},
+]
+
+def col_letter_to_index(col):
+    result = 0
+    for char in col.upper():
+        result = result * 26 + (ord(char) - ord('A') + 1)
+    return result - 1
 
 def get_token():
     res = requests.post(
@@ -26,14 +38,14 @@ def get_token():
     )
     return res.json()["tenant_access_token"]
 
-def read_sheet(token, spreadsheet, sheet_range):
+def read_sheet(spreadsheet, sheet_range):
     access_token = get_token()
     headers = {"Authorization": "Bearer " + access_token}
     url = "https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/" + spreadsheet + "/values/" + sheet_range
     res = requests.get(url, headers=headers)
     return res.json().get("data", {}).get("valueRange", {}).get("values", [])
 
-def write_cell(token, spreadsheet, cell_range, value):
+def write_cell(spreadsheet, cell_range, value):
     access_token = get_token()
     headers = {"Authorization": "Bearer " + access_token}
     url = "https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/" + spreadsheet + "/values"
@@ -41,32 +53,41 @@ def write_cell(token, spreadsheet, cell_range, value):
 
 def match_location():
     try:
+        # 建立表2匹配字典
         lookup = {}
-        for sheet in SHEETS:
+        for sheet in TABLE2_SHEETS:
             sid = sheet["id"]
             city = sheet["city"]
-            rows = read_sheet(TABLE2_TOKEN, TABLE2_TOKEN, sid + "!O2:R200")
+            rows = read_sheet(TABLE2_TOKEN, sid + "!O2:R200")
             for row in rows:
                 o_val = str(row[0]).strip() if len(row) > 0 and row[0] else ""
                 r_val = str(row[3]).strip() if len(row) > 3 and row[3] else ""
                 if o_val and r_val:
                     lookup[city + "|" + o_val[:10]] = r_val
 
-        rows = read_sheet(TABLE1_TOKEN, TABLE1_TOKEN, TABLE1_SHEET + "!A2:T500")
-        for i, row in enumerate(rows):
-            row_num = i + 2
-            a_val = str(row[0]).strip() if len(row) > 0 and row[0] else ""
-            d_val = str(row[3]).strip() if len(row) > 3 and row[3] else ""
-            t_val = str(row[19]).strip() if len(row) > 19 and row[19] else ""
+        # 遍历表1所有sheet
+        for t1sheet in TABLE1_SHEETS:
+            sid = t1sheet["id"]
+            title_idx = t1sheet["title_col_index"]
+            out_col = t1sheet["output_col_letter"]
+            out_idx = col_letter_to_index(out_col)
+            end_col = out_col
 
-            if a_val and d_val and not t_val:
-                key = a_val + "|" + d_val[:10]
-                if key in lookup:
-                    cell_range = TABLE1_SHEET + "!T" + str(row_num) + ":T" + str(row_num)
-                    write_cell(TABLE1_TOKEN, TABLE1_TOKEN, cell_range, lookup[key])
-                    print("写入第" + str(row_num) + "行")
+            rows = read_sheet(TABLE1_TOKEN, sid + "!A2:" + end_col + "500")
+            for i, row in enumerate(rows):
+                row_num = i + 2
+                a_val = str(row[0]).strip() if len(row) > 0 and row[0] else ""
+                d_val = str(row[title_idx]).strip() if len(row) > title_idx and row[title_idx] else ""
+                t_val = str(row[out_idx]).strip() if len(row) > out_idx and row[out_idx] else ""
 
-        print("完成")
+                if a_val and d_val and not t_val:
+                    key = a_val + "|" + d_val[:10]
+                    if key in lookup:
+                        cell_range = sid + "!" + out_col + str(row_num) + ":" + out_col + str(row_num)
+                        write_cell(TABLE1_TOKEN, cell_range, lookup[key])
+                        print("写入 " + sid + " 第" + str(row_num) + "行")
+
+        print("匹配完成")
     except Exception as e:
         print("错误: " + str(e))
 
