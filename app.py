@@ -19,16 +19,16 @@ TABLE2_SHEETS = [
 ]
 
 TABLE1_SHEETS = [
-    {"id": "1SeQMO", "city_col": "A", "title_col": "D", "output_col": "T", "title_col_index": 3, "output_col_letter": "T"},
-    {"id": "0VAckj", "city_col": "A", "title_col": "D", "output_col": "Q", "title_col_index": 3, "output_col_letter": "Q"},
-    {"id": "2HSink", "city_col": "A", "title_col": "G", "output_col": "AE", "title_col_index": 6, "output_col_letter": "AE"},
-    {"id": "3ByYkO", "city_col": "A", "title_col": "D", "output_col": "L", "title_col_index": 3, "output_col_letter": "L"},
+    {"id": "1SeQMO", "title_col_index": 3, "output_col_letter": "T"},
+    {"id": "0VAckj", "title_col_index": 3, "output_col_letter": "Q"},
+    {"id": "2HSink", "title_col_index": 6, "output_col_letter": "AE"},
+    {"id": "3ByYkO", "title_col_index": 3, "output_col_letter": "L"},
 ]
 
 def col_letter_to_index(col):
     result = 0
     for char in col.upper():
-        result = result * 26 + (ord(char) - ord('A') + 1)
+        result = result * 26 + (ord(char) - ord("A") + 1)
     return result - 1
 
 def get_token():
@@ -53,7 +53,6 @@ def write_cell(spreadsheet, cell_range, value):
 
 def match_location():
     try:
-        # 建立表2匹配字典
         lookup = {}
         for sheet in TABLE2_SHEETS:
             sid = sheet["id"]
@@ -65,23 +64,26 @@ def match_location():
                 if o_val and r_val:
                     lookup[city + "|" + o_val[:10]] = r_val
 
-        # 遍历表1所有sheet
         for t1sheet in TABLE1_SHEETS:
             sid = t1sheet["id"]
             title_idx = t1sheet["title_col_index"]
             out_col = t1sheet["output_col_letter"]
             out_idx = col_letter_to_index(out_col)
-            end_col = out_col
 
             rows = read_sheet(TABLE1_TOKEN, sid + "!A2:AZ500")
+
             for i, row in enumerate(rows):
                 row_num = i + 2
                 a_val = str(row[0]).strip() if len(row) > 0 and row[0] else ""
                 d_val = str(row[title_idx]).strip() if len(row) > title_idx and row[title_idx] else ""
                 t_val = str(row[out_idx]).strip() if len(row) > out_idx and row[out_idx] else ""
 
-                if sid == "3ByYkO" and i < 5:
-                    print("行" + str(row_num) + " A=" + a_val + " D=" + d_val[:10])
+                if sid == "3ByYkO" and i < 6:
+                    print("sheet4 行" + str(row_num) + " A=" + repr(a_val) + " D=" + repr(d_val[:10]))
+
+                if a_val and d_val and not t_val:
+                    key = a_val + "|" + d_val[:10]
+                    if key in lookup:
                         cell_range = sid + "!" + out_col + str(row_num) + ":" + out_col + str(row_num)
                         write_cell(TABLE1_TOKEN, cell_range, lookup[key])
                         print("写入 " + sid + " 第" + str(row_num) + "行")
