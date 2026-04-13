@@ -19,10 +19,10 @@ TABLE2_SHEETS = [
 ]
 
 TABLE1_SHEETS = [
-    {"id": "1SeQMO", "title_col_index": 3, "output_col_letter": "T"},
-    {"id": "0VAckj", "title_col_index": 3, "output_col_letter": "Q"},
-    {"id": "2HSink", "title_col_index": 6, "output_col_letter": "AE"},
-    {"id": "3ByYkO", "title_col_index": 3, "output_col_letter": "L"},
+    {"id": "1SeQMO", "title_col_index": 3, "output_col_letter": "T", "city_source": "direct"},
+    {"id": "0VAckj", "title_col_index": 3, "output_col_letter": "Q", "city_source": "direct"},
+    {"id": "2HSink", "title_col_index": 6, "output_col_letter": "AE", "city_source": "direct"},
+    {"id": "3ByYkO", "title_col_index": 3, "output_col_letter": "L", "city_source": "from_douyin"},
 ]
 
 def col_letter_to_index(col):
@@ -41,7 +41,7 @@ def get_token():
 def read_sheet(spreadsheet, sheet_range):
     access_token = get_token()
     headers = {"Authorization": "Bearer " + access_token}
-    url = "https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/" + spreadsheet + "/values/" + sheet_range + "?valueRenderOption=FormattedValue"
+    url = "https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/" + spreadsheet + "/values/" + sheet_range
     res = requests.get(url, headers=headers)
     return res.json().get("data", {}).get("valueRange", {}).get("values", [])
 
@@ -53,6 +53,7 @@ def write_cell(spreadsheet, cell_range, value):
 
 def match_location():
     try:
+        # 建立表2匹配字典 key: 城市|标题前10字 -> 共享位置
         lookup = {}
         for sheet in TABLE2_SHEETS:
             sid = sheet["id"]
@@ -64,29 +65,46 @@ def match_location():
                 if o_val and r_val:
                     lookup[city + "|" + o_val[:10]] = r_val
 
+        # 建立抖音sheet的标题->城市映射 key: 标题前10字 -> 城市
+        douyin_city_map = {}
+        douyin_rows = read_sheet(TABLE1_TOKEN, "1SeQMO!A2:D500")
+        for row in douyin_rows:
+            a_val = str(row[0]).strip() if len(row) > 0 and row[0] else ""
+            d_val = str(row[3]).strip() if len(row) > 3 and row[3] else ""
+            if a_val and d_val:
+                douyin_city_map[d_val[:10]] = a_val
+
+        # 遍历表1所有sheet
         for t1sheet in TABLE1_SHEETS:
             sid = t1sheet["id"]
             title_idx = t1sheet["title_col_index"]
             out_col = t1sheet["output_col_letter"]
             out_idx = col_letter_to_index(out_col)
+            city_source = t1sheet["city_source"]
 
             rows = read_sheet(TABLE1_TOKEN, sid + "!A2:AZ500")
 
             for i, row in enumerate(rows):
                 row_num = i + 2
-                a_val = str(row[0]).strip() if len(row) > 0 and row[0] else ""
                 d_val = str(row[title_idx]).strip() if len(row) > title_idx and row[title_idx] else ""
                 t_val = str(row[out_idx]).strip() if len(row) > out_idx and row[out_idx] else ""
 
-                if sid == "3ByYkO" and i < 6:
-                    print("sheet4 行" + str(row_num) + " A=" + repr(a_val) + " D=" + repr(d_val[:10]))
+                if not d_val or t_val:
+                    continue
 
-                if a_val and d_val and not t_val:
+                # 获取城市
+                if city_source == "direct":
+                    a_val = str(row[0]).strip() if len(row) > 0 and row[0] else ""
+                else:
+                    # 从抖音sheet里根据标题前10字找城市
+                    a_val = douyin_city_map.get(d_val[:10], "")
+
+                if a_val and d_val:
                     key = a_val + "|" + d_val[:10]
                     if key in lookup:
                         cell_range = sid + "!" + out_col + str(row_num) + ":" + out_col + str(row_num)
                         write_cell(TABLE1_TOKEN, cell_range, lookup[key])
-                        print("写入 " + sid + " 第" + str(row_num) + "行")
+                        print("写入 " + sid + " 第" + str(row_num) + "行 城市=" + a_val)
 
         print("匹配完成")
     except Exception as e:
